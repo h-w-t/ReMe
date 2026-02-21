@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import time
 from abc import ABC, abstractmethod
 from typing import Callable, Generator, AsyncGenerator, Any
@@ -20,7 +21,9 @@ class BaseLLM(ABC):
 
     def __init__(
         self,
-        model_name: str,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        model_name: str = "",
         max_retries: int = 10,
         raise_exception: bool = False,
         request_interval: float = 0.0,
@@ -35,6 +38,8 @@ class BaseLLM(ABC):
             request_interval: Minimum seconds between requests (default: 0.0)
             **kwargs: Additional model-specific parameters
         """
+        self._api_key: str = api_key
+        self._base_url: str = base_url
         self.model_name: str = model_name
         self.max_retries: int = max_retries
         self.raise_exception: bool = raise_exception
@@ -43,6 +48,16 @@ class BaseLLM(ABC):
 
         self._last_request_time: float = 0.0
         self._request_lock: asyncio.Lock = asyncio.Lock()
+
+    @property
+    def api_key(self) -> str | None:
+        """Get API key from environment variable."""
+        return os.getenv("REME_LLM_API_KEY") or self._api_key
+
+    @property
+    def base_url(self) -> str | None:
+        """Get base URL from environment variable."""
+        return os.getenv("REME_LLM_BASE_URL") or self._base_url
 
     @staticmethod
     def _accumulate_tool_call_chunk(tool_call, ret_tools: list[ToolCall]):
@@ -99,7 +114,6 @@ class BaseLLM(ABC):
         stream_kwargs: dict,
     ) -> AsyncGenerator[StreamChunk, None]:
         """Async generator for streaming response chunks."""
-        raise NotImplementedError
 
     def _stream_chat_sync(
         self,
@@ -108,7 +122,6 @@ class BaseLLM(ABC):
         stream_kwargs: dict | None = None,
     ) -> Generator[StreamChunk, None, None]:
         """Sync generator for streaming response chunks."""
-        raise NotImplementedError
 
     async def stream_chat(
         self,
@@ -117,7 +130,7 @@ class BaseLLM(ABC):
         model_name: str | None = None,
         **kwargs,
     ) -> AsyncGenerator[StreamChunk, None]:
-        """Stream chat completions with retries."""
+        """Stream chat completions with retries and return final message."""
         if self.request_interval > 0:
             async with self._request_lock:
                 current_time = time.time()
@@ -143,7 +156,8 @@ class BaseLLM(ABC):
             try:
                 async for chunk in self._stream_chat(messages=messages, tools=tools, stream_kwargs=stream_kwargs):
                     yield chunk
-                return
+
+                break
 
             except Exception as e:
                 logger.exception(f"Stream chat error (model={self.model_name}): {e.args}")
@@ -152,7 +166,7 @@ class BaseLLM(ABC):
                     if self.raise_exception:
                         raise e
                     yield StreamChunk(chunk_type=ChunkEnum.ERROR, chunk=str(e))
-                    return
+                    break
 
                 yield StreamChunk(chunk_type=ChunkEnum.ERROR, chunk=str(e))
                 await asyncio.sleep(i + 1)
@@ -170,7 +184,7 @@ class BaseLLM(ABC):
         for i in range(self.max_retries):
             try:
                 yield from self._stream_chat_sync(messages=messages, tools=tools, stream_kwargs=stream_kwargs)
-                return
+                break
 
             except Exception as e:
                 logger.exception(f"Stream chat sync error (model={self.model_name}): {e.args}")
@@ -179,7 +193,7 @@ class BaseLLM(ABC):
                     if self.raise_exception:
                         raise e
                     yield StreamChunk(chunk_type=ChunkEnum.ERROR, chunk=str(e))
-                    return
+                    break
 
                 yield StreamChunk(chunk_type=ChunkEnum.ERROR, chunk=str(e))
                 time.sleep(i + 1)
@@ -462,7 +476,7 @@ class BaseLLM(ABC):
     async def simple_request(
         self,
         prompt: str,
-        model_name: str,
+        model_name: str | None = None,
         callback_fn: Callable[[Message], Any] | None = None,
         default_value: Any = None,
         **kwargs,
@@ -480,7 +494,7 @@ class BaseLLM(ABC):
     async def simple_request_for_json(
         self,
         prompt: str,
-        model_name: str,
+        model_name: str | None = None,
         **kwargs,
     ) -> dict:
         """Make a simple request using the LLM and extract JSON."""

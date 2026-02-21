@@ -37,7 +37,7 @@ from .tool.memory import (
     AddHistory,
     ReadAllProfiles,
     UpdateProfilesV1,
-    UpdateMemoryV1,
+    AddMemory,
 )
 
 
@@ -48,64 +48,48 @@ class ReMe(Application):
         self,
         *args,
         llm_api_key: str | None = None,
-        llm_api_base: str | None = None,
+        llm_base_url: str | None = None,
         embedding_api_key: str | None = None,
-        embedding_api_base: str | None = None,
+        embedding_base_url: str | None = None,
+        working_dir: str = ".reme",
+        config_path: str = "default",
         enable_logo: bool = True,
-        llm: dict | None = None,
-        embedding_model: dict | None = None,
-        vector_store: dict | None = None,
-        token_counter: dict | None = None,
+        log_to_console: bool = True,
+        default_llm_config: dict | None = None,
+        default_embedding_model_config: dict | None = None,
+        default_vector_store_config: dict | None = None,
+        default_token_counter_config: dict | None = None,
         target_user_names: list[str] | None = None,
         target_task_names: list[str] | None = None,
         target_tool_names: list[str] | None = None,
-        profile_dir: str = ".reme/profile",
         **kwargs,
     ):
         """Initialize ReMe with config.
-
-        Args:
-            *args: Arguments passed to Application
-            llm_api_key: API key for LLM provider
-            llm_api_base: API base for LLM provider
-            embedding_api_key: API key for embedding provider
-            embedding_api_base: API base for embedding provider
-            enable_logo: Enable logo
-            llm: LLM configuration
-            embedding_model: Embedding model configuration
-            vector_store: Vector store configuration
-            token_counter: Token counter configuration
-            target_user_names: List of user names for personal memory
-            target_task_names: List of task names for procedural memory
-            target_tool_names: List of tool names for tool memory
-            profile_dir: Directory for profile storage
-            **kwargs: Additional keyword arguments passed to Application
 
         Example:
             ```python
             reme = ReMe(...)
             await reme.start()
-            # reme = await ReMe.create(...)  # both ok
-
             await reme.summarize_memory(...)
             await reme.retrieve_memory(...)
-
             await reme.close()
             ```
-
         """
         super().__init__(
             *args,
             llm_api_key=llm_api_key,
-            llm_api_base=llm_api_base,
+            llm_base_url=llm_base_url,
             embedding_api_key=embedding_api_key,
-            embedding_api_base=embedding_api_base,
+            embedding_base_url=embedding_base_url,
+            working_dir=working_dir,
+            config_path=config_path,
             enable_logo=enable_logo,
+            log_to_console=log_to_console,
             parser=ReMeConfigParser,
-            llm=llm,
-            embedding_model=embedding_model,
-            vector_store=vector_store,
-            token_counter=token_counter,
+            default_llm_config=default_llm_config,
+            default_embedding_model_config=default_embedding_model_config,
+            default_vector_store_config=default_vector_store_config,
+            default_token_counter_config=default_token_counter_config,
             **kwargs,
         )
         memory_target_type_mapping: dict[str, MemoryType] = {}
@@ -125,7 +109,10 @@ class ReMe(Application):
                 memory_target_type_mapping[name] = MemoryType.TOOL
 
         self.service_context.memory_target_type_mapping = memory_target_type_mapping
-        self.profile_dir: str = profile_dir
+
+        profile_path = Path(self.service_context.service_config.working_dir) / "profile"
+        profile_path.mkdir(parents=True, exist_ok=True)
+        self.profile_dir: str = str(profile_path)
 
     def _add_meta_memory(self, memory_type: str | MemoryType, memory_target: str):
         """Register or validate a memory target with the given memory type."""
@@ -184,6 +171,7 @@ class ReMe(Application):
         version: str = "default",
         retrieve_top_k: int = 20,
         return_dict: bool = False,
+        llm_config_name: str = "default",
         **kwargs,
     ) -> str | dict:
         """Summarize personal, procedural and tool memories for the given context."""
@@ -197,6 +185,7 @@ class ReMe(Application):
         personal_summarizer: BaseMemoryAgent
         if version == "default":
             personal_summarizer = PersonalSummarizer(
+                llm=llm_config_name,
                 tools=[
                     AddAndRetrieveSimilarMemory(
                         enable_thinking_params=enable_thinking_params,
@@ -216,6 +205,7 @@ class ReMe(Application):
 
         elif version == "v1":
             personal_summarizer = PersonalV1Summarizer(
+                llm=llm_config_name,
                 tools=[
                     AddDraftAndRetrieveSimilarMemory(
                         enable_thinking_params=enable_thinking_params,
@@ -223,7 +213,7 @@ class ReMe(Application):
                         enable_when_to_use=False,
                         enable_multiple=True,
                     ),
-                    UpdateMemoryV1(
+                    AddMemory(
                         enable_thinking_params=enable_thinking_params,
                         enable_memory_target=False,
                         enable_when_to_use=False,
@@ -244,6 +234,7 @@ class ReMe(Application):
             )
         elif version == "v2":
             personal_summarizer = PersonalV1Summarizer(
+                llm=llm_config_name,
                 tools=[
                     AddDraftAndRetrieveSimilarMemory(
                         enable_thinking_params=enable_thinking_params,
@@ -251,7 +242,7 @@ class ReMe(Application):
                         enable_when_to_use=False,
                         enable_multiple=True,
                     ),
-                    UpdateMemoryV1(
+                    AddMemory(
                         enable_thinking_params=enable_thinking_params,
                         enable_memory_target=False,
                         enable_when_to_use=False,
@@ -272,6 +263,7 @@ class ReMe(Application):
             )
         elif version == "halumem":
             personal_summarizer = PersonalHalumemSummarizer(
+                llm=llm_config_name,
                 tools=[
                     AddAndRetrieveSimilarMemory(
                         enable_thinking_params=enable_thinking_params,
@@ -382,6 +374,7 @@ class ReMe(Application):
         retrieve_top_k: int = 20,
         enable_time_filter: bool = True,
         return_dict: bool = False,
+        llm_config_name: str = "default",
         **kwargs,
     ) -> str | dict:
         """Retrieve relevant personal, procedural and tool memories for a query."""
@@ -389,6 +382,7 @@ class ReMe(Application):
         personal_retriever: BaseMemoryAgent
         if version == "default":
             personal_retriever = PersonalRetriever(
+                llm=llm_config_name,
                 tools=[
                     ReadAllProfiles(
                         enable_thinking_params=enable_thinking_params,
@@ -405,6 +399,7 @@ class ReMe(Application):
 
         elif version == "v1":
             personal_retriever = PersonalV1Retriever(
+                llm=llm_config_name,
                 return_memory_nodes=False,
                 tools=[
                     ReadAllProfiles(
@@ -426,6 +421,7 @@ class ReMe(Application):
             )
         elif version == "v2":
             personal_retriever = PersonalV1Retriever(
+                llm=llm_config_name,
                 return_memory_nodes=False,
                 tools=[
                     ReadAllProfiles(
@@ -449,6 +445,7 @@ class ReMe(Application):
             )
         elif version == "halumem":
             personal_retriever = PersonalHalumemRetriever(
+                llm=llm_config_name,
                 tools=[
                     ReadAllProfiles(
                         enable_thinking_params=enable_thinking_params,
@@ -598,7 +595,7 @@ class ReMe(Application):
         Returns:
             MemoryNode: The retrieved memory node
         """
-        vector_node = await self.vector_store.get(memory_id)
+        vector_node = await self.default_vector_store.get(memory_id)
         return MemoryNode.from_vector_node(vector_node)
 
     async def delete_memory(
@@ -610,11 +607,11 @@ class ReMe(Application):
         Args:
             memory_id: The ID of the memory to delete
         """
-        await self.vector_store.delete(memory_id)
+        await self.default_vector_store.delete(memory_id)
 
     async def delete_all(self):
         """Delete all memory nodes in the vector store."""
-        await self.vector_store.delete_all()
+        await self.default_vector_store.delete_all()
 
     async def update_memory(
         self,
@@ -707,7 +704,7 @@ class ReMe(Application):
     @property
     def profile_path(self) -> Path:
         """Get the path to the profile directory."""
-        return Path(self.profile_dir) / self.vector_store.collection_name
+        return Path(self.profile_dir) / self.default_vector_store.collection_name
 
     def get_profile_handler(self, user_name: str) -> ProfileHandler:
         """Get the profile handler for the specified user."""

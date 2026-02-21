@@ -83,6 +83,7 @@ class MemoryStoreConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     backend: str = Field(default="sqlite")
+    db_name: str = Field(default="reme.db")
     store_name: str = Field(default="reme")
     embedding_model: str = Field(default="default")
 
@@ -96,6 +97,16 @@ class TokenCounterConfig(BaseModel):
     model_name: str = Field(default="")
 
 
+class FileWatcherConfig(BaseModel):
+    """Configuration for file watcher service."""
+
+    model_config = ConfigDict(extra="allow")
+
+    backend: str = Field(default="")
+    memory_store: str = Field(default="")
+    watch_paths: list[str] = Field(default_factory=list)
+
+
 class ServiceConfig(BaseModel):
     """Root configuration schema aggregating all service-level settings and components."""
 
@@ -103,11 +114,12 @@ class ServiceConfig(BaseModel):
 
     backend: str = Field(default="")
     app_name: str = Field(default=os.getenv("APP_NAME", "ReMe"))
+    working_dir: str | None = Field(default=None)
     enable_logo: bool = Field(default=True)
     language: str = Field(default="")
     thread_pool_max_workers: int = Field(default=16)
     ray_max_workers: int = Field(default=-1)
-    init_logger: bool = Field(default=True)
+    log_to_console: bool = Field(default=True)
     disabled_flows: list[str] = Field(default_factory=list)
     enabled_flows: list[str] = Field(default_factory=list)
     mcp_servers: dict[str, dict] = Field(default_factory=dict)
@@ -115,9 +127,12 @@ class ServiceConfig(BaseModel):
     mcp: MCPConfig = Field(default_factory=MCPConfig)
     http: HttpConfig = Field(default_factory=HttpConfig)
     cmd: CmdConfig = Field(default_factory=CmdConfig)
-    flow: dict[str, FlowConfig] = Field(default_factory=dict)
-    llm: dict[str, LLMConfig] = Field(default_factory=dict)
-    embedding_model: dict[str, EmbeddingModelConfig] = Field(default_factory=dict)
-    vector_store: dict[str, VectorStoreConfig] = Field(default_factory=dict)
-    memory_store: dict[str, MemoryStoreConfig] = Field(default_factory=dict)
-    token_counter: dict[str, TokenCounterConfig] = Field(default_factory=dict)
+    flows: dict[str, FlowConfig] = Field(default_factory=dict)
+    llms: dict[str, LLMConfig] = Field(default_factory=dict)
+    embedding_models: dict[str, EmbeddingModelConfig] = Field(default_factory=dict)
+    vector_stores: dict[str, VectorStoreConfig] = Field(default_factory=dict)
+    memory_stores: dict[str, MemoryStoreConfig] = Field(default_factory=dict)
+    token_counters: dict[str, TokenCounterConfig] = Field(default_factory=dict)
+    file_watchers: dict[str, FileWatcherConfig] = Field(default_factory=dict)
+
+    metadata: dict = Field(default_factory=dict)

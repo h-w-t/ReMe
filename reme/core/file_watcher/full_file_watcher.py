@@ -5,7 +5,7 @@ on any change, ensuring complete synchronization.
 """
 
 import asyncio
-import os
+from pathlib import Path
 
 from loguru import logger
 from watchfiles import Change
@@ -19,28 +19,25 @@ from ..utils import chunk_markdown, hash_text
 class FullFileWatcher(BaseFileWatcher):
     """Full file watcher implementation for full synchronization"""
 
-    def __init__(self, chunk_tokens: int = 400, chunk_overlap: int = 80, **kwargs):
+    def __init__(self, **kwargs):
         """
         Initialize full file watcher"""
         super().__init__(**kwargs)
-        self.chunk_tokens = chunk_tokens
-        self.chunk_overlap = chunk_overlap
         self.dirty = False
 
     @staticmethod
     async def _build_file_metadata(path: str) -> FileMetadata:
+        file_path = Path(path)
+
         def _read_file_sync():
-            stat_t = os.stat(path)
-            with open(path, "r", encoding="utf-8") as f:
-                content_t = f.read()
-            return stat_t, content_t
+            return file_path.stat(), file_path.read_text(encoding="utf-8")
 
         stat, content = await asyncio.to_thread(_read_file_sync)
         return FileMetadata(
             hash=hash_text(content),
             mtime_ms=stat.st_mtime * 1000,
             size=stat.st_size,
-            path=path,
+            path=str(file_path.absolute()),
             content=content,
         )
 
@@ -63,11 +60,16 @@ class FullFileWatcher(BaseFileWatcher):
                 if chunks:
                     chunks = await self.memory_store.get_chunk_embeddings(chunks)
                 file_meta.chunk_count = len(chunks)
+
                 await self.memory_store.delete_file(file_meta.path, MemorySource.MEMORY)
+                logger.info(f"delete_file {file_meta.path}")
+
                 await self.memory_store.upsert_file(file_meta, MemorySource.MEMORY, chunks)
+                logger.info(f"Upserted {file_meta.chunk_count} chunks for {file_meta.path}")
 
             elif change_type == Change.deleted:
                 await self.memory_store.delete_file(path, MemorySource.MEMORY)
+                logger.info(f"Deleted {path}")
 
             else:
                 logger.warning(f"Unknown change type: {change_type}")

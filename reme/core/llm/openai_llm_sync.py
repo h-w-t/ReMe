@@ -26,7 +26,7 @@ class OpenAILLMSync(OpenAILLM):
     ) -> Generator[StreamChunk, None, None]:
         """Synchronously generate a stream of chat completion chunks including text, reasoning, and tool calls."""
         stream_kwargs = stream_kwargs or {}
-        completion = self._client.chat.completions.create(**stream_kwargs)
+        completion = self.client.chat.completions.create(**stream_kwargs)
         ret_tool_calls: list[ToolCall] = []
 
         for chunk in completion:
@@ -37,10 +37,10 @@ class OpenAILLMSync(OpenAILLM):
 
             delta = chunk.choices[0].delta
 
-            if hasattr(delta, "reasoning_content") and delta.reasoning_content is not None:
+            if hasattr(delta, "reasoning_content") and delta.reasoning_content:
                 yield StreamChunk(chunk_type=ChunkEnum.THINK, chunk=delta.reasoning_content)
 
-            if delta.content is not None:
+            if delta.content:
                 yield StreamChunk(chunk_type=ChunkEnum.ANSWER, chunk=delta.content)
 
             if delta.tool_calls is not None:
@@ -52,4 +52,7 @@ class OpenAILLMSync(OpenAILLM):
 
     def close_sync(self):
         """Close the synchronous OpenAI client and release network resources."""
-        self._client.close()
+        if self._client is not None:
+            self._client.close()
+            self._client = None
+        super().close_sync()

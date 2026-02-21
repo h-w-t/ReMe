@@ -2,8 +2,6 @@
 
 from typing import Generator
 
-import litellm
-
 from .lite_llm import LiteLLM
 from ..enumeration import ChunkEnum
 from ..schema import Message
@@ -21,6 +19,8 @@ class LiteLLMSync(LiteLLM):
         stream_kwargs: dict | None = None,
     ) -> Generator[StreamChunk, None, None]:
         """Internal synchronous generator for processing streaming chat completion chunks."""
+        import litellm
+
         stream_kwargs = stream_kwargs or {}
         completion = litellm.completion(**stream_kwargs)
         ret_tool_calls: list[ToolCall] = []
@@ -33,10 +33,10 @@ class LiteLLMSync(LiteLLM):
 
             delta = chunk.choices[0].delta
 
-            if hasattr(delta, "reasoning_content") and delta.reasoning_content is not None:
+            if hasattr(delta, "reasoning_content") and delta.reasoning_content:
                 yield StreamChunk(chunk_type=ChunkEnum.THINK, chunk=delta.reasoning_content)
 
-            if delta.content is not None:
+            if delta.content:
                 yield StreamChunk(chunk_type=ChunkEnum.ANSWER, chunk=delta.content)
 
             if hasattr(delta, "tool_calls") and delta.tool_calls is not None:

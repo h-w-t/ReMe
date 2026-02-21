@@ -2,6 +2,7 @@
 
 import os
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -15,10 +16,11 @@ if TYPE_CHECKING:
     from ..llm import BaseLLM
     from ..embedding import BaseEmbeddingModel
     from ..vector_store import BaseVectorStore
+    from ..memory_store import BaseMemoryStore
     from ..token_counter import BaseTokenCounter
     from ..flow import BaseFlow
     from ..service import BaseService
-    from ..memory_storage import BaseMemoryStore
+    from ..file_watcher import BaseFileWatcher
 
 
 class ServiceContext(BaseContext):
@@ -28,39 +30,67 @@ class ServiceContext(BaseContext):
         self,
         *args,
         llm_api_key: str | None = None,
-        llm_api_base: str | None = None,
+        llm_base_url: str | None = None,
         embedding_api_key: str | None = None,
-        embedding_api_base: str | None = None,
+        embedding_base_url: str | None = None,
         service_config: ServiceConfig | None = None,
         parser: type[PydanticConfigParser] | None = None,
+        working_dir: str | None = None,
         config_path: str | None = None,
         enable_logo: bool = True,
-        llm: dict | None = None,
-        embedding_model: dict | None = None,
-        vector_store: dict | None = None,
-        token_counter: dict | None = None,
+        log_to_console: bool = True,
+        default_llm_config: dict | None = None,
+        default_embedding_model_config: dict | None = None,
+        default_vector_store_config: dict | None = None,
+        default_memory_store_config: dict | None = None,
+        default_token_counter_config: dict | None = None,
+        default_file_watcher_config: dict | None = None,
         **kwargs,
     ):
         super().__init__()
-        self.service_config: ServiceConfig = self._build_service_config(
-            *args,
-            llm_api_key=llm_api_key,
-            llm_api_base=llm_api_base,
-            embedding_api_key=embedding_api_key,
-            embedding_api_base=embedding_api_base,
-            service_config=service_config,
-            parser=parser,
-            config_path=config_path,
-            enable_logo=enable_logo,
-            llm=llm,
-            embedding_model=embedding_model,
-            vector_store=vector_store,
-            token_counter=token_counter,
-            **kwargs,
-        )
 
-        if self.service_config.init_logger:
-            init_logger()
+        load_env()
+        self.update_api_envs(llm_api_key, llm_base_url, embedding_api_key, embedding_base_url)
+
+        if service_config is None:
+            parser_class = parser if parser is not None else PydanticConfigParser
+            parser = parser_class(ServiceConfig)
+            input_args = []
+            if config_path:
+                input_args.append(f"config={config_path}")
+            if args:
+                input_args.extend(args)
+
+            if default_llm_config:
+                self._update_section_config(kwargs, "llms", **default_llm_config)
+            if default_embedding_model_config:
+                self._update_section_config(kwargs, "embedding_models", **default_embedding_model_config)
+            if default_token_counter_config:
+                self._update_section_config(kwargs, "token_counters", **default_token_counter_config)
+            if default_vector_store_config:
+                self._update_section_config(kwargs, "vector_stores", **default_vector_store_config)
+            if default_memory_store_config:
+                self._update_section_config(kwargs, "memory_stores", **default_memory_store_config)
+            if default_file_watcher_config:
+                self._update_section_config(kwargs, "file_watchers", **default_file_watcher_config)
+
+            kwargs.update(
+                {
+                    "enable_logo": enable_logo,
+                    "log_to_console": log_to_console,
+                    "working_dir": working_dir,
+                },
+            )
+            logger.info(f"update with args: {input_args} kwargs: {kwargs}")
+            service_config = parser.parse_args(*input_args, **kwargs)
+
+        self.service_config: ServiceConfig = service_config
+        init_logger(log_to_console=self.service_config.log_to_console)
+        logger.info(f"ReMe Config: {service_config.model_dump_json()}")
+
+        if self.service_config.working_dir:
+            self.working_path = Path(self.service_config.working_dir)
+            self.working_path.mkdir(parents=True, exist_ok=True)
 
         if self.service_config.enable_logo:
             print_logo(service_config=self.service_config)
@@ -79,78 +109,45 @@ class ServiceContext(BaseContext):
         self.token_counters: dict[str, "BaseTokenCounter"] = {}
         self.vector_stores: dict[str, "BaseVectorStore"] = {}
         self.memory_stores: dict[str, "BaseMemoryStore"] = {}
+        self.file_watchers: dict[str, "BaseFileWatcher"] = {}
 
         self.flows: dict[str, "BaseFlow"] = {}
         self.mcp_server_mapping: dict[str, dict] = {}
-        self.service: "BaseService" = R.service[self.service_config.backend](service_context=self)
+        self.service: "BaseService" = R.services[self.service_config.backend](service_context=self)
 
         self._build_flows()
 
-    def _build_service_config(
-        self,
-        *args,
-        llm_api_key: str | None = None,
-        llm_api_base: str | None = None,
-        embedding_api_key: str | None = None,
-        embedding_api_base: str | None = None,
-        service_config: ServiceConfig | None = None,
-        parser: type[PydanticConfigParser] | None = None,
-        config_path: str | None = None,
-        enable_logo: bool = True,
-        llm: dict | None = None,
-        embedding_model: dict | None = None,
-        vector_store: dict | None = None,
-        token_counter: dict | None = None,
-        **kwargs,
-    ) -> ServiceConfig:
-
-        load_env()
-        self._update_env("REME_LLM_API_KEY", llm_api_key)
-        self._update_env("REME_LLM_BASE_URL", llm_api_base)
-        self._update_env("REME_EMBEDDING_API_KEY", embedding_api_key)
-        self._update_env("REME_EMBEDDING_BASE_URL", embedding_api_base)
-
-        if service_config is None:
-            parser_class = parser if parser is not None else PydanticConfigParser
-            parser = parser_class(ServiceConfig)
-            input_args = []
-            if config_path:
-                input_args.append(f"config={config_path}")
-            if args:
-                input_args.extend(args)
-            if kwargs:
-                input_args.extend([f"{k}={v}" for k, v in kwargs.items()])
-            service_config = parser.parse_args(*input_args)
-
-        service_config.enable_logo = enable_logo
-        if llm:
-            self._update_section_config(service_config, "llm", **llm)
-        if embedding_model:
-            self._update_section_config(service_config, "embedding_model", **embedding_model)
-        if token_counter:
-            self._update_section_config(service_config, "token_counter", **token_counter)
-        if vector_store:
-            self._update_section_config(service_config, "vector_store", **vector_store)
-        return service_config
-
     @staticmethod
-    def _update_env(key: str, value: str | None):
+    def update_env(key: str, value: str | None):
         """Update environment variable if value is provided."""
         if value:
             os.environ[key] = value
 
+    def update_api_envs(
+        self,
+        llm_api_key: str | None = None,
+        llm_base_url: str | None = None,
+        embedding_api_key: str | None = None,
+        embedding_base_url: str | None = None,
+    ):
+        """Update common environment variables for LLM and embedding services."""
+        self.update_env("REME_LLM_API_KEY", llm_api_key)
+        self.update_env("REME_LLM_BASE_URL", llm_base_url)
+        self.update_env("REME_EMBEDDING_API_KEY", embedding_api_key)
+        self.update_env("REME_EMBEDDING_BASE_URL", embedding_base_url)
+
     @staticmethod
-    def _update_section_config(service_config: ServiceConfig, section_name: str, **kwargs):
+    def _update_section_config(config: dict, section_name: str, **kwargs):
         """Update a specific section of the service config with new values."""
-        section_dict: dict = getattr(service_config, section_name)
-        if "default" not in section_dict:
-            raise KeyError(f"Default `{section_name}` config not found")
-        current_config = section_dict["default"]
-        section_dict["default"] = current_config.model_copy(update=kwargs, deep=True)
+        if section_name not in config:
+            config[section_name] = {}
+        if "default" not in config[section_name]:
+            config[section_name]["default"] = {}
+        config[section_name]["default"].update(kwargs)
 
     def _build_flows(self):
         expression_flow_cls = None
-        for name, flow_cls in R.flow.items():
+        for name, flow_cls in R.flows.items():
             if not self._filter_flows(name):
                 continue
 
@@ -161,7 +158,7 @@ class ServiceContext(BaseContext):
                 self.flows[flow.name] = flow
 
         if expression_flow_cls is not None:
-            for name, flow_config in self.service_config.flow.items():
+            for name, flow_config in self.service_config.flows.items():
                 if not self._filter_flows(name):
                     continue
                 flow_config.name = name
@@ -172,37 +169,83 @@ class ServiceContext(BaseContext):
 
     async def start(self):
         """Start the service context by initializing all configured components."""
-        for name, config in self.service_config.llm.items():
-            self.llms[name] = R.llm[config.backend](model_name=config.model_name, **config.model_extra)
-
-        for name, config in self.service_config.embedding_model.items():
-            self.embedding_models[name] = R.embedding_model[config.backend](
-                model_name=config.model_name,
-                **config.model_extra,
+        # Recreate thread pool if it was shut down
+        if self.thread_pool is None or self.thread_pool._shutdown:  # pylint: disable=protected-access
+            self.thread_pool = ThreadPoolExecutor(
+                max_workers=self.service_config.thread_pool_max_workers,
             )
 
-        for name, config in self.service_config.token_counter.items():
-            self.token_counters[name] = R.token_counter[config.backend](
-                model_name=config.model_name,
-                **config.model_extra,
-            )
+        # Re-initialize Ray if it was shut down
+        if self.service_config.ray_max_workers > 1:
+            import ray
 
-        for name, config in self.service_config.vector_store.items():
-            self.vector_stores[name] = R.vector_store[config.backend](
-                collection_name=config.collection_name,
-                embedding_model=self.embedding_models[config.embedding_model],
-                thread_pool=self.thread_pool,
-                **config.model_extra,
-            )
-            await self.vector_stores[name].create_collection(config.collection_name)
+            if not ray.is_initialized():
+                ray.init(num_cpus=self.service_config.ray_max_workers)
 
-        for name, config in self.service_config.memory_store.items():
-            self.memory_stores[name] = R.memory_store[config.backend](
-                store_name=config.store_name,
-                embedding_model=self.embedding_models[config.embedding_model],
-                **config.model_extra,
-            )
-            await self.memory_stores[name].start()
+        for name, config in self.service_config.llms.items():
+            if config.backend not in R.llms:
+                logger.warning(f"LLM backend {config.backend} is not supported.")
+            else:
+                self.llms[name] = R.llms[config.backend](model_name=config.model_name, **config.model_extra)
+
+        for name, config in self.service_config.embedding_models.items():
+            if config.backend not in R.embedding_models:
+                logger.warning(f"Embedding model backend {config.backend} is not supported.")
+            else:
+                self.embedding_models[name] = R.embedding_models[config.backend](
+                    cache_dir=self.working_path / "embedding_cache",
+                    model_name=config.model_name,
+                    **config.model_extra,
+                )
+
+        for name, config in self.service_config.token_counters.items():
+            if config.backend not in R.token_counters:
+                logger.warning(f"Token counter backend {config.backend} is not supported.")
+            else:
+                self.token_counters[name] = R.token_counters[config.backend](
+                    model_name=config.model_name,
+                    **config.model_extra,
+                )
+
+        for name, config in self.service_config.vector_stores.items():
+            if config.backend not in R.vector_stores:
+                logger.warning(f"Vector store backend {config.backend} is not supported.")
+            else:
+                # Extract config dict and replace special fields with actual instances
+                config_dict = config.model_dump(exclude={"backend", "embedding_model"})
+                config_dict.update(
+                    {
+                        "embedding_model": self.embedding_models[config.embedding_model],
+                        "thread_pool": self.thread_pool,
+                    },
+                )
+                self.vector_stores[name] = R.vector_stores[config.backend](**config_dict)
+                await self.vector_stores[name].create_collection(config.collection_name)
+
+        for name, config in self.service_config.memory_stores.items():
+            if config.backend not in R.memory_stores:
+                logger.warning(f"Memory store backend {config.backend} is not supported.")
+            else:
+                # Extract config dict and replace embedding_model string with actual instance
+                config_dict = config.model_dump(exclude={"backend", "embedding_model"})
+                config_dict.update(
+                    {
+                        "embedding_model": self.embedding_models[config.embedding_model],
+                        "thread_pool": self.thread_pool,
+                        "db_path": self.working_path / config.db_name,
+                    },
+                )
+                self.memory_stores[name] = R.memory_stores[config.backend](**config_dict)
+                await self.memory_stores[name].start()
+
+        for name, config in self.service_config.file_watchers.items():
+            if config.backend not in R.file_watchers:
+                logger.warning(f"File watcher backend {config.backend} is not supported.")
+            else:
+                config_dict = config.model_dump(exclude={"backend", "memory_store"})
+                config_dict["memory_store"] = self.memory_stores[config.memory_store]
+                self.file_watchers[name] = R.file_watchers[config.backend](**config_dict)
+                await self.file_watchers[name].start()
 
         if self.service_config.mcp_servers:
             await self.prepare_mcp_servers()
@@ -234,16 +277,24 @@ class ServiceContext(BaseContext):
 
     async def close(self):
         """Close all service components asynchronously."""
-        for _, vector_store in self.vector_stores.items():
+        for name, vector_store in self.vector_stores.items():
+            logger.info(f"Closing vector store: {name}")
             await vector_store.close()
 
-        for _, memory_store in self.memory_stores.items():
+        for name, memory_store in self.memory_stores.items():
+            logger.info(f"Closing memory store: {name}")
             await memory_store.close()
 
-        for _, llm in self.llms.items():
+        for name, file_watcher in self.file_watchers.items():
+            logger.info(f"Closing file watcher: {name}")
+            await file_watcher.close()
+
+        for name, llm in self.llms.items():
+            logger.info(f"Closing LLM: {name}")
             await llm.close()
 
-        for _, embedding_model in self.embedding_models.items():
+        for name, embedding_model in self.embedding_models.items():
+            logger.info(f"Closing embedding model: {name}")
             await embedding_model.close()
 
         self.shutdown_thread_pool()

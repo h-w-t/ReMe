@@ -71,7 +71,7 @@ class BaseReact(BaseOp):
         assistant_message: Message = await self.llm.chat(messages=messages, tools=tool_calls, **kwargs)
         messages.append(assistant_message)
         assistant_content: str = assistant_message.simple_dump(as_dict=False)
-        logger.info(f"[{self.__class__.__name__} {stage or ''} step{step + 1}] assistant={assistant_content}")
+        logger.info(f"[{self.__class__.__name__} {stage or ''} step{step}] assistant={assistant_content}")
 
         # Determine if tools should be called
         should_act = bool(assistant_message.tool_calls)
@@ -95,7 +95,7 @@ class BaseReact(BaseOp):
         # Create tool name to tool instance mapping
         tool_dict = {t.tool_call.name: t for t in tools}
         for j, tool_call in enumerate(assistant_message.tool_calls):
-            prefix: str = f"[{self.__class__.__name__} {stage or ''} step{step + 1}.{j}]"
+            prefix: str = f"[{self.__class__.__name__} {stage or ''} step{step}.{j}]"
             if tool_call.name not in tool_dict:
                 logger.warning(f"{prefix} unknown tool_call={tool_call.name}")
                 continue
@@ -125,7 +125,7 @@ class BaseReact(BaseOp):
                     tool_call_id=tool.tool_call.id,
                 ),
             )
-            prefix: str = f"[{self.__class__.__name__} {stage or ''} step{step + 1}.{j}]"
+            prefix: str = f"[{self.__class__.__name__} {stage or ''} step{step}.{j}]"
             logger.info(f"{prefix} join tool={tool.name} result={tool.response.answer}")
         return tool_list, tool_messages
 
@@ -153,7 +153,7 @@ class BaseReact(BaseOp):
         """Execute the ReAct agent and return final results."""
         # Log available tools
         for i, tool in enumerate(self.tools):
-            logger.info(f"[{self.__class__.__name__}] tool_call[{i}]={tool.tool_call.simple_input_dump(as_dict=False)}")
+            logger.info(f"[{self.__class__.__name__}] {i}.tool_call={tool.tool_call.simple_input_dump(as_dict=False)}")
 
         # Build and log initial messages
         messages = await self.build_messages()
@@ -163,8 +163,13 @@ class BaseReact(BaseOp):
 
         # Run ReAct loop
         t_tools, messages, success = await self.react(messages, self.tools)
+
+        # Get the last assistant message as the final answer
+        assistant_messages = [m for m in messages if m.role == Role.ASSISTANT]
+        answer = assistant_messages[-1].content if assistant_messages else ""
+
         return {
-            "answer": messages[-1].content if success else "",
+            "answer": answer,
             "success": success,
             "messages": messages,
             "tools": t_tools,

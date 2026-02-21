@@ -1,9 +1,7 @@
 """LiteLLM asynchronous implementation for ReMe."""
 
-import os
 from typing import AsyncGenerator
 
-import litellm
 from loguru import logger
 
 from .base_llm import BaseLLM
@@ -16,17 +14,9 @@ from ..schema import ToolCall
 class LiteLLM(BaseLLM):
     """Async LLM implementation using LiteLLM to support multiple providers."""
 
-    def __init__(
-        self,
-        api_key: str | None = None,
-        base_url: str | None = None,
-        custom_llm_provider: str = "openai",
-        **kwargs,
-    ):
+    def __init__(self, custom_llm_provider: str = "openai", **kwargs):
         """Initialize the LiteLLM client with API configuration and provider settings."""
         super().__init__(**kwargs)
-        self.api_key: str | None = api_key or os.getenv("REME_LLM_API_KEY")
-        self.base_url: str | None = base_url or os.getenv("REME_LLM_BASE_URL")
         self.custom_llm_provider: str = custom_llm_provider
 
     def _build_stream_kwargs(
@@ -88,6 +78,8 @@ class LiteLLM(BaseLLM):
         stream_kwargs: dict | None = None,
     ) -> AsyncGenerator[StreamChunk, None]:
         """Execute async streaming chat requests and yield processed response chunks."""
+        import litellm
+
         stream_kwargs = stream_kwargs or {}
         completion = await litellm.acompletion(**stream_kwargs)
         ret_tool_calls: list[ToolCall] = []
@@ -100,10 +92,10 @@ class LiteLLM(BaseLLM):
 
             delta = chunk.choices[0].delta
 
-            if hasattr(delta, "reasoning_content") and delta.reasoning_content is not None:
+            if hasattr(delta, "reasoning_content") and delta.reasoning_content:
                 yield StreamChunk(chunk_type=ChunkEnum.THINK, chunk=delta.reasoning_content)
 
-            if delta.content is not None:
+            if delta.content:
                 yield StreamChunk(chunk_type=ChunkEnum.ANSWER, chunk=delta.content)
 
             if hasattr(delta, "tool_calls") and delta.tool_calls is not None:

@@ -1,8 +1,8 @@
 """schema"""
 
+from .cut_point_result import CutPointResult
 from .file_metadata import FileMetadata
 from .memory_chunk import MemoryChunk
-from .memory_index_meta import MemoryIndexMeta
 from .memory_node import MemoryNode
 from .memory_search_result import MemorySearchResult
 from .message import ContentBlock, Message, Trajectory
@@ -25,6 +25,7 @@ from .truncation_result import TruncationResult
 from .vector_node import VectorNode
 
 __all__ = [
+    "CutPointResult",
     "CmdConfig",
     "ContentBlock",
     "EmbeddingModelConfig",
@@ -34,7 +35,6 @@ __all__ = [
     "LLMConfig",
     "MCPConfig",
     "MemoryChunk",
-    "MemoryIndexMeta",
     "MemoryNode",
     "MemorySearchResult",
     "Message",

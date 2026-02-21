@@ -253,7 +253,7 @@ flow:
 llm:
   default:
     backend: openai_compatible
-    model_name: qwen3-30b-a3b-instruct-2507
+    model_name: qwen/qwen3-30b-a3b-instruct-2507
     params:
       temperature: 0.6
     token_count: # Optional
@@ -312,7 +312,7 @@ llm:
 
   qwen3_30b_instruct:
     backend: openai_compatible
-    model_name: qwen3-30b-a3b-instruct-2507
+    model_name: qwen/qwen3-30b-a3b-instruct-2507
     token_count: # Optional
       model_name: Qwen/Qwen3-30B-A3B-Instruct-2507
       backend: hf
@@ -385,7 +385,9 @@ llm:
 embedding_model:
   default:
     backend: openai_compatible
-    model_name: text-embedding-v4
+    base_url: http://localhost:1234/v1
+    api_key: sk-lm-e2e0PK8Q:mCXt3UaHAA2w9jOiI1Bc
+    model_name: text-embedding-qwen3-embedding-0.6b
     params:
       dimensions: 1024
 

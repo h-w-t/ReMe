@@ -28,18 +28,18 @@ llms:
   # Local LLM
   qwen3_8b_instruct:
     backend: openai
-    model_name: qwen3-8b
+    model_name: qwen/qwen3-8b
     request_interval: 1
 
   # Cloud High-Performance Model
   qwen3_max_instruct:
     backend: openai
-    model_name: gpt-5.1
+    model_name: qwen/qwen3-max
     request_interval: 2
 
   qwen-plus-thinking:
     backend: openai
-    model_name: qwen-plus
+    model_name: qwen/qwen-plus-2025-07-28:thinking
     request_interval: 1
     extra_body:
       enable_thinking: True

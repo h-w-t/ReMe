@@ -115,17 +115,9 @@ async def main():
     print("ReMe Simple Demo - 本地模型测试")
     print("🚀" * 30)
     
-    # 使用本地模型配置
+    # 使用云端 API（FLOW_LLM_* env vars），向量存储用内存（fast, no persistence）
     try:
         async with ReMeApp(
-            "llm.default.backend=openai_compatible",
-            "llm.default.base_url=http://localhost:1234/v1",
-            "llm.default.api_key=sk-lm-e2e0PK8Q:mCXt3UaHAA2w9jOiI1Bc",
-            "llm.default.model_name=qwen/qwen3-8b",
-            "embedding_model.default.backend=openai_compatible",
-            "embedding_model.default.base_url=http://localhost:1234/v1",
-            "embedding_model.default.api_key=sk-lm-e2e0PK8Q:mCXt3UaHAA2w9jOiI1Bc",
-            "embedding_model.default.model_name=text-embedding-qwen3-embedding-4b",
             "vector_store.default.backend=memory",
         ) as app:
             
@@ -135,18 +127,17 @@ async def main():
             # 测试任务记忆
             task_ok = await test_task_memory(app)
             
-            # 暂时跳过个人记忆测试，调试完任务记忆后再启用
-            # personal_ok = await test_personal_memory(app)
-            personal_ok = True  # 临时设为 True
+            # 测试个人记忆
+            personal_ok = await test_personal_memory(app)
             
             # 总结
             print("\n" + "=" * 60)
             print("📊 测试总结")
             print("=" * 60)
             print(f"任务记忆: {'✅ 通过' if task_ok else '❌ 失败'}")
-            print(f"个人记忆: {'⏭️  跳过' if personal_ok else '❌ 失败'}")
+            print(f"个人记忆: {'✅ 通过' if personal_ok else '❌ 失败'}")
             
-            if task_ok:
+            if task_ok and personal_ok:
                 print("\n🎉 任务记忆测试通过！ReMe 本地模型配置基本正常！")
                 return 0
             else:

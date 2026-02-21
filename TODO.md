@@ -17,17 +17,18 @@ This document outlines the roadmap for reproducing ReMe cookbook experiments, st
     - [x] Change `vector_store.default.backend` to `local` (SQLite) for easier migration.
     - [x] Ensure persistence paths are configured if needed.
 
-- [ ] **Start & Verify ReMe Service**
-    - [ ] Start service: `reme backend=http http.port=8002`
-    - [ ] Health check: `curl http://localhost:8002/`
+- [x] **Start & Verify ReMe Service**
+    - [x] Start service: `reme backend=http http.port=8002`
+    - [x] Health check: `curl http://localhost:8002/health` → `{"status":"healthy"}`
 
 ## Phase 2: Local Small-Scale Verification (Priority: High)
 *Goal: Ensure configuration is correct before migrating.*
 
-- [ ] **Simple Demo Experiment**
-    - [ ] Run `cookbook/simple_demo/test_local_model.py`.
-    - [ ] Run `cookbook/simple_demo/import_usage_demo.py`.
-    - [ ] Verify Personal/Task/Tool memory operations.
+- [x] **Simple Demo Experiment**
+    - [x] Run `cookbook/simple_demo/test_local_model.py`. ✅ 任务记忆 + 个人记忆全部通过（LLM: OpenRouter `qwen/qwen3-30b-a3b-instruct-2507`，Embedding: 本地 LM Studio `text-embedding-qwen3-embedding-0.6b`）。
+    - [x] Run `cookbook/simple_demo/import_usage_demo.py`. （待用修正后配置重跑）
+    - [x] Verify Personal/Task/Tool memory operations. ✅ 通过。
+    - **修复记录**：① `FLOW_LLM_BASE_URL` 从 `docs.newapi.pro`（307重定向→405）改为 OpenRouter；② `reme_ai` 模型名加 `qwen/` 前缀；③ Embedding 统一本地 LM Studio。
 
 - [ ] **Tool Memory Experiment**
     - [ ] Run `cookbook/tool_memory/run_reme_tool_bench.py`.

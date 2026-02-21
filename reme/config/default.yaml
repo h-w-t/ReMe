@@ -25,9 +25,16 @@ llms:
     request_interval: 1
 #    temperature: 0.0001
 
+  # Local LLM
+  qwen3_8b_instruct:
+    backend: openai
+    model_name: qwen3-8b
+    request_interval: 1
+
+  # Cloud High-Performance Model
   qwen3_max_instruct:
     backend: openai
-    model_name: qwen3-max
+    model_name: gpt-5.1
     request_interval: 2
 
   qwen-plus-thinking:
@@ -40,13 +47,13 @@ llms:
 embedding_models:
   default:
     backend: openai
-    model_name: text-embedding-v4
+    model_name: text-embedding-qwen3-embedding-0.6b
     dimensions: 1024
 
 vector_stores:
   default:
-    backend: chroma
-#    backend: local
+    backend: local
+#    backend: chroma
     embedding_model: default
     collection_name: reme
 

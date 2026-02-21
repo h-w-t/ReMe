@@ -16,7 +16,7 @@ from flowllm.core.schema import ToolCall
 from flowllm.core.utils import Timer
 from loguru import logger
 
-from reme_ai.agent.tools.mock_search_tools import SearchToolA, SearchToolB, SearchToolC
+from reme_ai.agent.tools.mock_search_tools import SearchToolAOp, SearchToolBOp, SearchToolCOp
 from reme_ai.schema.memory import ToolCallResult
 
 
@@ -93,9 +93,9 @@ class UseMockSearchOp(BaseAsyncToolOp):
         logger.info(f"query={query}")
 
         tool_ops = [
-            SearchToolA(),
-            SearchToolB(),
-            SearchToolC(),
+            SearchToolAOp(),
+            SearchToolBOp(),
+            SearchToolCOp(),
         ]
 
         # Step 1: Select the appropriate tool using LLM

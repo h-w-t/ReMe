@@ -31,9 +31,10 @@ This document outlines the roadmap for reproducing ReMe cookbook experiments, st
     - **修复记录**：① `FLOW_LLM_BASE_URL` 从 `docs.newapi.pro`（307重定向→405）改为 OpenRouter；② `reme_ai` 模型名加 `qwen/` 前缀；③ Embedding 统一本地 LM Studio。
 
 - [ ] **Tool Memory Experiment**
-    - [ ] Run `cookbook/tool_memory/run_reme_tool_bench.py`.
-    - [ ] Verify execution completes and results are generated.
-    - [ ] Target Benchmark: ~14.88% improvement.
+    - [x] Run `cookbook/tool_memory/run_reme_tool_bench.py`.
+    - [x] Verify execution completes and results are generated.
+    - [x] Target Benchmark: ~14.88% improvement. ✅ **实测 Epoch 1: +16.75% ↑**（Test 无记忆 avg_score=0.400 → 有记忆 avg_score=0.467）。
+    - **修复记录**：① `SearchToolA/B/C` 类名不符合 flowllm 框架"必须以 `Op` 结尾"的要求，重命名为 `SearchToolAOp/BOp/COp`，并同步更新 `mock_search_tools.py`、`use_mock_search_op.py`、`__init__.py`。
 
 ## Phase 3: Cloud Migration Preparation (Priority: Medium)
 *Goal: Package code and scripts for cloud deployment.*

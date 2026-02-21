@@ -12,7 +12,7 @@ from reme_ai.agent.tools.llm_mock_search_op import LLMMockSearchOp
 
 
 @C.register_op()
-class SearchToolA(LLMMockSearchOp):
+class SearchToolAOp(LLMMockSearchOp):
     """Fast search tool optimized for simple queries.
 
     This tool is configured for quick responses with high success rates
@@ -21,7 +21,7 @@ class SearchToolA(LLMMockSearchOp):
     """
 
     def __init__(self, llm: str = "qwen3_30b_instruct", **kwargs):
-        """Initialize SearchToolA with fast, simple-query-optimized configuration.
+        """Initialize SearchToolAOp with fast, simple-query-optimized configuration.
 
         Args:
             llm: LLM model name to use
@@ -69,7 +69,7 @@ class SearchToolA(LLMMockSearchOp):
 
 
 @C.register_op()
-class SearchToolB(LLMMockSearchOp):
+class SearchToolBOp(LLMMockSearchOp):
     """Balanced search tool optimized for medium complexity queries.
 
     This tool provides balanced performance across query types, with
@@ -78,7 +78,7 @@ class SearchToolB(LLMMockSearchOp):
     """
 
     def __init__(self, llm: str = "qwen3_30b_instruct", **kwargs):
-        """Initialize SearchToolB with balanced, medium-query-optimized configuration.
+        """Initialize SearchToolBOp with balanced, medium-query-optimized configuration.
 
         Args:
             llm: LLM model name to use
@@ -126,7 +126,7 @@ class SearchToolB(LLMMockSearchOp):
 
 
 @C.register_op()
-class SearchToolC(LLMMockSearchOp):
+class SearchToolCOp(LLMMockSearchOp):
     """Comprehensive search tool optimized for complex queries.
 
     This tool provides thorough, in-depth results with high success rates
@@ -135,7 +135,7 @@ class SearchToolC(LLMMockSearchOp):
     """
 
     def __init__(self, llm: str = "qwen3_30b_instruct", **kwargs):
-        """Initialize SearchToolC with comprehensive, complex-query-optimized configuration.
+        """Initialize SearchToolCOp with comprehensive, complex-query-optimized configuration.
 
         Args:
             llm: LLM model name to use

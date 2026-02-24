@@ -86,9 +86,9 @@ This document outlines the roadmap for reproducing ReMe cookbook experiments, st
     - [x] Both `llm_config_name` references updated.
     - [x] Default `reme_model_name` → `qwen3:8b`, `eval_model_name` → `qwen3:30b-a3b-instruct-q8_0`, `max_concurrency` → `3`.
 
-- [ ] **Logging & Monitoring**
-    - [ ] Verify Loguru file sink configured (output to `./logs/`).
-    - [ ] Ensure all result files are written to persistent `./exp_result/` or `./bench_results/`.
+- [x] **Logging & Monitoring**
+    - [x] Verify Loguru file sink configured (output to `./logs/`). ✅ `init_logger()` called from `service_context.py`，logs/ 目录已有历史日志文件。
+    - [x] Ensure all result files are written to persistent `./exp_result/` or `./bench_results/`. ✅ 所有 run_*.py 均使用 `Path.mkdir(parents=True, exist_ok=True)` 自动创建。
 
 ## Phase 4: Cloud Deployment & Large-Scale Experiments (Priority: High)
 *Goal: Run all experiments on OpenBayes A6000 48GB with Ollama.*

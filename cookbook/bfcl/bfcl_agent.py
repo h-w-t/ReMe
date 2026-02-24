@@ -60,7 +60,7 @@ class BFCLAgent:
         experiment_name: str,
         data_path: str = os.getenv("BFCL_DATA_PATH"),
         answer_path: Path = Path(os.getenv("BFCL_ANSWER_PATH")),
-        model_name: str = "qwen3-8b",
+        model_name: str = "qwen3:8b",
         temperature: float = 0.9,
         max_interactions: int = 30,
         max_response_size: int = 2000,

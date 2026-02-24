@@ -218,7 +218,7 @@ if __name__ == "__main__":
         main()
     else:
         print("Running in compatibility mode...")
-        with open("exp_result/qwen3-8b/no_think/bfcl-multi-turn-base_wo-exp.jsonl", "r") as f:
+        with open("exp_result/qwen3:8b/no_think/bfcl-multi-turn-base_wo-exp.jsonl", "r") as f:
             data = [json.loads(line) for line in f]
 
         grouped_trajectories = group_trajectories_by_task_id(data)

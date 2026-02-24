@@ -20,7 +20,7 @@ def run_agent(
     experiment_suffix: str,
     max_workers: int,
     num_trials: int = 1,
-    model_name: str = "qwen3-8b",
+    model_name: str = "qwen3:8b",
     data_path: str = "data/multiturn_data_base_val.jsonl",
     answer_path: Path = Path("data/possible_answer"),
     use_memory: bool = False,
@@ -91,7 +91,7 @@ def main():
     num_runs = 1
 
     num_trials = 2
-    model_name="qwen3-8b"
+    model_name="qwen3:8b"
     use_memory = False
     use_memory_addition = False
     use_memory_deletion = False

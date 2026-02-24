@@ -38,7 +38,7 @@ class FrozenLakeReactAgent:
         index: int,
         task_configs: List[Dict],
         experiment_name: str,
-        model_name: str = "qwen3-8b",
+        model_name: str = "qwen3:8b",
         temperature: float = 0.7,
         max_steps: int = 50,
         num_runs: int = 1,

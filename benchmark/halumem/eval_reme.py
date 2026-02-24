@@ -969,6 +969,20 @@ def main(
 
 
 if __name__ == "__main__":
+    # ── Token Tracker: must be patched BEFORE any OpenAI client is created ──
+    try:
+        from token_tracker import (
+            patch_openai,
+            patch_async_openai,
+            start_periodic_logging,
+        )
+        patch_openai()        # intercept sync calls (eval/QA functions)
+        patch_async_openai()  # intercept async calls (ReMe internal LLM ops)
+        start_periodic_logging(interval=120, label="HaluMem")
+    except Exception as _te:
+        import logging as _logging
+        _logging.warning(f"[TokenTracker] unavailable: {_te}")
+
     import argparse
 
     parser = argparse.ArgumentParser(

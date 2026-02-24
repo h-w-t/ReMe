@@ -218,6 +218,13 @@ class BaseLLM(ABC):
         stream_kwargs = self._build_stream_kwargs(messages, tools, model_name=model_name, **kwargs)
         async for stream_chunk in self._stream_chat(messages=messages, tools=tools, stream_kwargs=stream_kwargs):
             if stream_chunk.chunk_type is ChunkEnum.USAGE:
+                _u = stream_chunk.chunk
+                logger.info(
+                    f"[TOKEN_USAGE] model={stream_kwargs.get('model', self.model_name)} "
+                    f"prompt={_u.get('prompt_tokens', '?')} "
+                    f"completion={_u.get('completion_tokens', '?')} "
+                    f"total={_u.get('total_tokens', '?')}"
+                )
                 if enable_stream_print:
                     print(
                         f"\n<usage>{json.dumps(stream_chunk.chunk, ensure_ascii=False, indent=2)}</usage>",
@@ -277,6 +284,13 @@ class BaseLLM(ABC):
         stream_kwargs = self._build_stream_kwargs(messages, tools, model_name=model_name, **kwargs)
         for stream_chunk in self._stream_chat_sync(messages=messages, tools=tools, stream_kwargs=stream_kwargs):
             if stream_chunk.chunk_type is ChunkEnum.USAGE:
+                _u = stream_chunk.chunk
+                logger.info(
+                    f"[TOKEN_USAGE] model={stream_kwargs.get('model', self.model_name)} "
+                    f"prompt={_u.get('prompt_tokens', '?')} "
+                    f"completion={_u.get('completion_tokens', '?')} "
+                    f"total={_u.get('total_tokens', '?')}"
+                )
                 if enable_stream_print:
                     print(
                         f"\n<usage>{json.dumps(stream_chunk.chunk, ensure_ascii=False, indent=2)}</usage>",

@@ -59,6 +59,15 @@ class FrozenLakeReactAgent:
         self.llm_client = OpenAI()
         self.action_map = {0: "LEFT", 1: "DOWN", 2: "RIGHT", 3: "UP"}
 
+        # Token tracking: patch openai in each Ray actor process
+        try:
+            import sys as _sys, os as _os
+            _sys.path.insert(0, _os.path.join(_os.path.dirname(__file__), ".."))
+            from token_tracker import patch_openai as _patch
+            _patch()
+        except Exception:
+            pass
+
         # Load prompts
         self.prompts = self._load_prompts()
 

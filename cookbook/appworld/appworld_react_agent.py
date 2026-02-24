@@ -67,6 +67,15 @@ class AppworldReactAgent:
 
         self.llm_client = OpenAI()
 
+        # Token tracking: patch openai in each Ray actor process
+        try:
+            import sys as _sys, os as _os
+            _sys.path.insert(0, _os.path.join(_os.path.dirname(__file__), ".."))
+            from token_tracker import patch_openai as _patch
+            _patch()
+        except Exception:
+            pass
+
         self.history: List[List[List[dict]]] = [[] for _ in range(num_trials)]
         self.retrieved_memory_list: List[List[List[Any]]] = [[] for _ in range(num_trials)]
 

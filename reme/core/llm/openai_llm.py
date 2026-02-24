@@ -59,6 +59,8 @@ class OpenAILLM(BaseLLM):
             "messages": [x.simple_dump() for x in messages],
             "tools": [x.simple_input_dump() for x in tools] if tools else None,
             "stream": True,
+            # Request token usage in the final streaming chunk (Ollama & OpenRouter both support this)
+            "stream_options": {"include_usage": True},
             **self.kwargs,
             **kwargs,
         }

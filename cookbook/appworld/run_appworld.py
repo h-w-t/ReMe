@@ -236,4 +236,12 @@ def main():
         )
 
 if __name__ == "__main__":
+    import sys as _sys
+    _sys.path.insert(0, "..")
+    try:
+        from token_tracker import patch_openai, start_periodic_logging
+        patch_openai()
+        start_periodic_logging(interval=120, label="AppWorld")
+    except Exception as _e:
+        logger.warning(f"TokenTracker unavailable: {_e}")
     main()

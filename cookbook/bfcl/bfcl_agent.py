@@ -232,84 +232,49 @@ class BFCLAgent:
         )
         response.raise_for_status()
 
+    def _inject_thinking_prefix(self, messages: list) -> list:
+        """Inject Ollama-compatible thinking control prefix into the first system message.
+
+        Ollama Qwen3 uses '/think' or '/no_think' at the start of the system prompt
+        to control chain-of-thought reasoning, replacing DashScope's extra_body approach.
+        """
+        prefix = "/think\n" if self.enable_thinking else "/no_think\n"
+        adapted = []
+        found_system = False
+        for msg in messages:
+            if msg.get("role") == "system" and not found_system:
+                adapted.append({**msg, "content": prefix + msg["content"]})
+                found_system = True
+            else:
+                adapted.append(msg)
+        if not found_system:
+            # No system message found; prepend a minimal one with only the prefix
+            adapted = [{"role": "system", "content": prefix.strip()}] + adapted
+        return adapted
+
     def call_llm(self, messages: list, tool_schemas: list[dict]) -> str:
+        """Call Ollama-compatible LLM endpoint.
+
+        Thinking mode is controlled via /think or /no_think system message prefix
+        instead of DashScope's extra_body={"enable_thinking": ...}.
+        """
+        adapted_messages = self._inject_thinking_prefix(messages)
         for i in range(100):
             try:
-                client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-                # Change this function to modify the base llm
+                client = OpenAI(
+                    api_key=os.getenv("OPENAI_API_KEY", "ollama"),
+                    base_url=os.getenv("OPENAI_BASE_URL", "http://localhost:11434/v1"),
+                )
                 response = client.chat.completions.create(
                     model=self.model_name,
-                    messages=messages,
+                    messages=adapted_messages,
                     tools=tool_schemas,
                     temperature=self.temperature,
                     seed=0,
-                    extra_body={"enable_thinking": self.enable_thinking},
-                    stream=self.enable_thinking,
                     parallel_tool_calls=True,
                 )
-                if not self.enable_thinking:
-                    out_msg = response.choices[0].message
-                    return out_msg.model_dump(exclude_unset=True, exclude_none=True)
-                else:
-                    reasoning_content = ""  # Complete reasoning process
-                    answer_content = ""  # Define complete response
-                    tool_info = []  # Store tool invocation information
-                    is_answering = (
-                        False  # Determine whether the reasoning process has finished and response has started
-                    )
-
-                    for chunk in response:
-                        if not chunk.choices:
-                            # Handle usage information
-                            continue
-                        else:
-                            delta = chunk.choices[0].delta
-                            # Handle AI's thought process (chain reasoning)
-                            if hasattr(delta, "reasoning_content") and delta.reasoning_content is not None:
-                                reasoning_content += delta.reasoning_content
-
-                            # Handle final response content
-                            else:
-                                if not is_answering:  # Print title when entering the response phase for the first time
-                                    is_answering = True
-                                if delta.content is not None:
-                                    answer_content += delta.content
-
-                                # Handle tool invocation information (support parallel tool calls)
-                                if delta.tool_calls is not None:
-                                    for tool_call in delta.tool_calls:
-                                        index = tool_call.index  # Tool call index, used for parallel calls
-
-                                        # Dynamically expand tool information storage list
-                                        while len(tool_info) <= index:
-                                            tool_info.append(
-                                                {
-                                                    "id": "",
-                                                    "type": "function",
-                                                    "index": index,
-                                                    "function": {"name": "", "arguments": ""},
-                                                },
-                                            )
-
-                                        # Collect tool call ID (used for subsequent function calls)
-                                        if tool_call.id:
-                                            tool_info[index]["id"] += tool_call.id
-
-                                        # Collect function name (used for subsequent routing to specific functions)
-                                        if tool_call.function and tool_call.function.name:
-                                            tool_info[index]["function"]["name"] += tool_call.function.name
-
-                                        # Collect function parameters (in JSON string format, need subsequent parsing)
-                                        if tool_call.function and tool_call.function.arguments:
-                                            tool_info[index]["function"]["arguments"] += tool_call.function.arguments
-                    msg = {
-                        "role": "assistant",
-                        "content": answer_content,
-                        "reasoning_content": reasoning_content,
-                    }
-                    if tool_info:
-                        msg["tool_calls"] = tool_info
-                    return msg
+                out_msg = response.choices[0].message
+                return out_msg.model_dump(exclude_unset=True, exclude_none=True)
             except Exception as e:
                 logger.exception(f"encounter error with {e.args}")
                 time.sleep(1 + i * 10)

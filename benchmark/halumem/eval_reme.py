@@ -39,11 +39,12 @@ class EvalConfig:
     data_path: str
     top_k: int = 20
     user_num: int = 1
-    max_concurrency: int = 1
+    # max_concurrency: int = 1
+    max_concurrency: int = 3
     batch_size: int = 40
     output_dir: str = "bench_results/reme"
-    reme_model_name: str = "qwen-flash"
-    eval_model_name: str = "qwen3-max"
+    reme_model_name: str = "google/gemini-2.5-flash"  # OR: 1M context, general-purpose
+    eval_model_name: str = "qwen/qwen3-max"  # OR: 1M context, QA evaluation
     algo_version: str = "v1"
     enable_thinking_params: bool = False
 
@@ -320,7 +321,7 @@ class MemoryProcessor:
                 return_dict=True,
                 enable_time_filter=True,
                 enable_thinking_params=self.enable_thinking_params,
-                llm_config_name="qwen-plus-t",
+                llm_config_name="qwen-plus-thinking",
             )
 
             duration_ms = (time.time() - start) * 1000
@@ -355,7 +356,7 @@ class MemoryProcessor:
             return_dict=True,
             enable_time_filter=True,
             enable_thinking_params=self.enable_thinking_params,
-            llm_config_name="qwen-plus-t",
+            llm_config_name="qwen-plus-thinking",
         )
 
         # Extract memories from response
@@ -567,12 +568,27 @@ class HaluMemEvaluator:
         self.config = config
         self.reme = ReMe(
             default_llm_config={
+                # reme_model_name routes to OpenRouter (1M context for long conversation histories)
+                # Set OPENROUTER_BASE_URL and OPENROUTER_API_KEY in .env.cloud
+                "backend": "openai",
+                "base_url": os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+                "api_key": os.getenv("OPENROUTER_API_KEY"),
                 "model_name": self.config.reme_model_name,
             },
             llms={
-                "qwen-plus-t": {
+                # qwen3_max_instruct: used by answer_question_with_memories and evaluation_for_question
+                "qwen3_max_instruct": {
                     "backend": "openai",
-                    "model_name": "qwen-plus",
+                    "base_url": os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+                    "api_key": os.getenv("OPENROUTER_API_KEY"),
+                    "model_name": self.config.eval_model_name,
+                },
+                # qwen-plus-thinking: memory reasoning with thinking mode (OpenRouter)
+                "qwen-plus-thinking": {
+                    "backend": "openai",
+                    "base_url": os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+                    "api_key": os.getenv("OPENROUTER_API_KEY"),
+                    "model_name": "qwen/qwen-plus-2025-07-28:thinking",
                     "extra_body": {
                         "enable_thinking": True,
                     },
@@ -962,8 +978,8 @@ if __name__ == "__main__":
         "--data_path",
         type=str,
         # required=True,
-        default="/Users/zhouwk/PycharmProjects/MemAgent/dataset/halumem/HaluMem-Medium.jsonl",
-        help="Path to HaluMem JSONL file",
+        default="./data/HaluMem-Medium.jsonl",
+        help="Path to HaluMem JSONL file (default: ./data/HaluMem-Medium.jsonl)",
     )
     parser.add_argument(
         "--top_k",
@@ -980,8 +996,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--max_concurrency",
         type=int,
-        default=1,
-        help="Maximum concurrent user processing (default: 100)",
+        default=3,
+        help="Maximum concurrent user processing (default: 3)",
     )
     parser.add_argument(
         "--batch_size",
@@ -992,14 +1008,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--reme_model_name",
         type=str,
-        default="qwen-flash",
-        help="Model name for ReMe (default: qwen-flash)",
+        default="google/gemini-2.5-flash",
+        help="Model name for ReMe memory ops via OpenRouter (default: google/gemini-2.5-flash, 1M context)",
     )
     parser.add_argument(
         "--eval_model_name",
         type=str,
-        default="qwen3-max",
-        help="Model name for evaluation (default: qwen3-max)",
+        default="qwen/qwen3-max",
+        help="Model name for QA evaluation via OpenRouter (default: qwen/qwen3-max, 1M context)",
     )
     parser.add_argument(
         "--algo_version",

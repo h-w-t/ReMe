@@ -42,6 +42,30 @@ llm:
       temperature: 0.7
       max_tokens: 4096
 
+  # ── Aliases required by hardcoded Op defaults ────────────────────────────────
+  # UseMockSearchOp / SearchToolAOp/BOp/COp / LLMMockSearchOp / AgenticRetrieveOp
+  # all have llm="qwen3_30b_instruct" as default → must exist in this config.
+  # We alias it to qwen3:8b (same as default) so no key-error on service start.
+  qwen3_30b_instruct:
+    backend: openai_compatible
+    base_url: http://localhost:11434/v1
+    api_key: ollama
+    model_name: qwen3:8b
+    params:
+      temperature: 0.7
+      max_tokens: 4096
+
+  # HaluMem answer_question_with_memories uses get_llm("qwen3_max_instruct")
+  # Route to OpenRouter (same key used in eval_reme.py client-side init)
+  qwen3_max_instruct:
+    backend: openai_compatible
+    base_url: ${OPENROUTER_BASE_URL}
+    api_key: ${OPENROUTER_API_KEY}
+    model_name: qwen/qwen3-max
+    params:
+      temperature: 0.7
+      max_tokens: 8192
+
   # HaluMem: memory summarize/retrieve ops (via OpenRouter, keeps extra_body)
   # Key name aligns with reme/config/default.yaml and eval_reme.py
   qwen-plus-thinking:

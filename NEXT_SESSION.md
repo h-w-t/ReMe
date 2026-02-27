@@ -13,14 +13,24 @@
 | 实验 | 层级 | 模型 | 路由 |
 |---|---|---|---|
 | FrozenLake / BFCL / ToolMemory | agent executor + ReMe Ops | `qwen3:8b` | Ollama |
-| HaluMem 底层 default LLM | `reme_model_name` | `google/gemini-2.5-flash` | OpenRouter |
-| HaluMem QA 生成 + 评估 | `qwen3_max_instruct` | `qwen/qwen3-max` | OpenRouter |
-| HaluMem 记忆推理 | `qwen-plus-thinking` | `qwen/qwen-plus-2025-07-28:thinking` | OpenRouter |
+| HaluMem 底层 default LLM | `reme_model_name` | `qwen-long` | 阿里云百炼 |
+| HaluMem QA 生成 + 评估 | `qwen3_max_instruct` | `qwen3-max` | 阿里云百炼 |
+| HaluMem 记忆推理 | `qwen-plus-thinking` | `qwen-plus-thinking-2025-01-21` | 阿里云百炼 |
 | Embedding（全部） | — | `text-embedding-qwen3-embedding-0.6b` | Ollama |
+
+> **为何用 `qwen-long` 而非 `qwen-flash`：**  
+> HaluMem 需要将每位用户百轮级别的完整对话历史塞入 prompt，gemini-flash 的核心优势恰好是 **1M token 上下文**。百炼平台唯一具备百万级窗口的模型是 `qwen-long`；`qwen-flash` 仅 128K，会截断长对话 prompt 导致错误。
 
 ### VRAM（RTX 4090 24GB）
 - Ollama 常驻：`qwen3:8b` (~5GB) + embed (~1GB) ≈ **6GB / 24GB**
-- HaluMem 期间全部走 OpenRouter，Ollama 仅保留 embed
+- HaluMem 期间重头 LLM 全走阿里云百炼，Ollama 仅保留 embed
+
+### 云端 API 路由（阿里云百炼）
+- **Base URL**：`https://dashscope.aliyuncs.com/compatible-mode/v1`
+- **API Key**：`sk-0ce872aef6e1414fa0d675e4d379c78e`（已在 `.env.cloud`，勿入 git）
+- `qwen-long`：百万 token 上下文，用于 HaluMem memory ops（替代 gemini-flash）
+- `qwen3-max`：高能力推理，用于 HaluMem QA 生成 + 评估
+- `qwen-plus-thinking-2025-01-21`：带 thinking 模式，用于 HaluMem 记忆推理，需 `enable_thinking: true`
 
 ### 环境变量（`.env.cloud` 模板，已在本地，未入 git）
 ```dotenv
@@ -30,8 +40,8 @@ FLOW_LLM_API_KEY=ollama
 FLOW_LLM_BASE_URL=http://localhost:11434/v1
 FLOW_EMBEDDING_API_KEY=ollama
 FLOW_EMBEDDING_BASE_URL=http://localhost:11434/v1
-OPENROUTER_API_KEY=sk-or-xxxx          # ← 填入真实 key
-OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+BAILIAN_API_KEY=sk-0ce872aef6e1414fa0d675e4d379c78e
+BAILIAN_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 ```
 
 ---
@@ -50,7 +60,7 @@ git checkout experiment/cloud-ollama
 
 # 配置环境变量（从本地上传或手动填写）
 cp .env.cloud .env          # .env.cloud 需手动上传，因未入 git
-# 编辑 .env，填入真实 OPENROUTER_API_KEY
+# BAILIAN_API_KEY 已写入 .env.cloud，无需额外编辑
 
 source activate.sh          # 安装依赖
 ```
@@ -59,7 +69,7 @@ source activate.sh          # 安装依赖
 ```bash
 ollama pull qwen3:8b
 ollama pull qwen3:0.6b-embedding    # → text-embedding-qwen3-embedding-0.6b
-# 注意：不需要 30b 模型（HaluMem 全走 OpenRouter）
+# 注意：不需要 30b 模型（HaluMem 重头 LLM 全走阿里云百炼）
 
 # 验证
 curl http://localhost:11434/v1/models
@@ -118,15 +128,16 @@ python eval_reme.py --user_num 2 --max_concurrency 1
 
 # 完整运行（默认参数即正确配置）
 python eval_reme.py --user_num 100 --max_concurrency 3
-# reme_model_name=google/gemini-2.5-flash（OR）
-# eval_model_name=qwen/qwen3-max（OR）
+# reme_model_name=qwen-long（百炼，1M context）
+# eval_model_name=qwen3-max（百炼）
+# qwen-plus-thinking=qwen-plus-thinking-2025-01-21（百炼，记忆推理）
 
 # 查看结果
 cat bench_results/reme/eval_statistics.json
 ```
 
 ### 7. ⚠️ 关闭实例
-Stage 2 完成后立即关闭，预计总计 ≈ 4hr → **≈ ¥10**
+Stage 2 完成后立即关闭，预计总计 ≈ 4hr → 算力 **≈ ¥10**，百炼 API 费用另计（HaluMem 100 用户约 ¥30–60，视实际 context 长度）
 
 ---
 
@@ -146,3 +157,6 @@ Stage 2 完成后立即关闭，预计总计 ≈ 4hr → **≈ ¥10**
 3. FrozenLake 和 BFCL 使用不同 `workspace_id`，可安全共享同一 ReMe 服务
 4. HaluMem `max_concurrency=3` 已在代码默认值中设置，无需额外参数
 5. HaluMem 数据集 URL 需自行获取（论文仓库或作者联系）
+6. **LLM 路由已从 OpenRouter 切换为阿里云百炼**：环境变量 `OPENROUTER_*` → `BAILIAN_*`，`cloud_ollama.yaml` 和 `eval_reme.py` 中模型名称已同步更新
+7. **`qwen-plus-thinking-2025-01-21` 需要 `enable_thinking: true`**（extra_body），百炼兼容 DashScope 参数，代码中已配置
+8. **`qwen-long` 计费按实际 tokens**，HaluMem 长对话 prompt 单次可达 200K+，请监控 token 追踪器输出（每 2 分钟打印一次）

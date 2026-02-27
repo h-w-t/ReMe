@@ -56,23 +56,23 @@ llm:
       max_tokens: 4096
 
   # HaluMem answer_question_with_memories uses get_llm("qwen3_max_instruct")
-  # Route to OpenRouter (same key used in eval_reme.py client-side init)
+  # Route to 阿里云百炼 (same key used in eval_reme.py client-side init)
   qwen3_max_instruct:
     backend: openai_compatible
-    base_url: ${OPENROUTER_BASE_URL}
-    api_key: ${OPENROUTER_API_KEY}
-    model_name: qwen/qwen3-max
+    base_url: ${BAILIAN_BASE_URL}
+    api_key: ${BAILIAN_API_KEY}
+    model_name: qwen3-max
     params:
       temperature: 0.7
       max_tokens: 8192
 
-  # HaluMem: memory summarize/retrieve ops (via OpenRouter, keeps extra_body)
+  # HaluMem: memory summarize/retrieve ops (via 阿里云百炼, thinking mode)
   # Key name aligns with reme/config/default.yaml and eval_reme.py
   qwen-plus-thinking:
     backend: openai_compatible
-    base_url: ${OPENROUTER_BASE_URL}
-    api_key: ${OPENROUTER_API_KEY}
-    model_name: qwen/qwen-plus-2025-07-28:thinking
+    base_url: ${BAILIAN_BASE_URL}
+    api_key: ${BAILIAN_API_KEY}
+    model_name: qwen-plus-thinking-2025-01-21
     extra_body:
       enable_thinking: true
 

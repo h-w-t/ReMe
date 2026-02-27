@@ -43,7 +43,7 @@ class EvalConfig:
     max_concurrency: int = 3
     batch_size: int = 40
     output_dir: str = "bench_results/reme"
-    reme_model_name: str = "qwen-long"  # 百炼: 1M context, for long conversation histories
+    reme_model_name: str = "qwen-flash"  # 百炼: default memory reasoning model (cost-effective)
     eval_model_name: str = "qwen3-max"  # 百炼: high-capability, QA evaluation
     algo_version: str = "v1"
     enable_thinking_params: bool = False
@@ -321,7 +321,6 @@ class MemoryProcessor:
                 return_dict=True,
                 enable_time_filter=True,
                 enable_thinking_params=self.enable_thinking_params,
-                llm_config_name="qwen-plus-thinking",
             )
 
             duration_ms = (time.time() - start) * 1000
@@ -356,7 +355,6 @@ class MemoryProcessor:
             return_dict=True,
             enable_time_filter=True,
             enable_thinking_params=self.enable_thinking_params,
-            llm_config_name="qwen-plus-thinking",
         )
 
         # Extract memories from response
@@ -567,33 +565,11 @@ class HaluMemEvaluator:
     def __init__(self, config: EvalConfig):
         self.config = config
         self.reme = ReMe(
-            default_llm_config={
-                # reme_model_name routes to 阿里云百炼 (1M context for long conversation histories)
-                # Set BAILIAN_BASE_URL and BAILIAN_API_KEY in .env.cloud
-                "backend": "openai",
-                "base_url": os.getenv("BAILIAN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
-                "api_key": os.getenv("BAILIAN_API_KEY"),
-                "model_name": self.config.reme_model_name,
-            },
-            llms={
-                # qwen3_max_instruct: used by answer_question_with_memories and evaluation_for_question
-                "qwen3_max_instruct": {
-                    "backend": "openai",
-                    "base_url": os.getenv("BAILIAN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
-                    "api_key": os.getenv("BAILIAN_API_KEY"),
-                    "model_name": self.config.eval_model_name,
-                },
-                # qwen-plus-thinking: memory reasoning with thinking mode (阿里云百炼)
-                "qwen-plus-thinking": {
-                    "backend": "openai",
-                    "base_url": os.getenv("BAILIAN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
-                    "api_key": os.getenv("BAILIAN_API_KEY"),
-                    "model_name": "qwen-plus-thinking-2025-01-21",
-                    "extra_body": {
-                        "enable_thinking": True,
-                    },
-                },
-            },
+            # Use BAILIAN_BASE_URL / BAILIAN_API_KEY from .env.cloud
+            # LLM keys (qwen3_max_instruct, qwen-plus-thinking) come from reme/config/default.yaml
+            llm_base_url=os.getenv("BAILIAN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+            llm_api_key=os.getenv("BAILIAN_API_KEY"),
+            default_llm_config={"model_name": self.config.reme_model_name},
         )
 
         # Load evaluation prompts into ReMe's prompt handler
@@ -918,7 +894,7 @@ async def main_async(
     batch_size: int,
     user_num: int,
     max_concurrency: int,
-    reme_model_name: str = "qwen-long",
+    reme_model_name: str = "qwen-flash",
     eval_model_name: str = "qwen3-max",
     algo_version: str = "halumem",
     enable_thinking_params: bool = False,
@@ -947,7 +923,7 @@ def main(
     batch_size: int,
     user_num: int,
     max_concurrency: int,
-    reme_model_name: str = "qwen-long",
+    reme_model_name: str = "qwen-flash",
     eval_model_name: str = "qwen3-max",
     algo_version: str = "halumem",
     enable_thinking_params: bool = False,
@@ -1022,8 +998,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--reme_model_name",
         type=str,
-        default="qwen-long",
-        help="Model name for ReMe memory ops via 阿里云百炼 (default: qwen-long, 1M context)",
+        default="qwen-flash",
+        help="Model name for ReMe memory ops via 阿里云百炼 (default: qwen-flash)",
     )
     parser.add_argument(
         "--eval_model_name",

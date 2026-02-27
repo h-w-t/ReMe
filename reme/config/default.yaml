@@ -34,12 +34,12 @@ llms:
   # Cloud High-Performance Model
   qwen3_max_instruct:
     backend: openai
-    model_name: qwen/qwen3-max
+    model_name: qwen3-max
     request_interval: 2
 
   qwen-plus-thinking:
     backend: openai
-    model_name: qwen/qwen-plus-2025-07-28:thinking
+    model_name: qwen-plus-thinking-2025-01-21
     request_interval: 1
     extra_body:
       enable_thinking: True

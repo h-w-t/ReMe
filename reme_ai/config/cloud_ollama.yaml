@@ -6,7 +6,7 @@
 # Model layout (RTX 4090 24GB):
 #   qwen3:8b  ~5 GB  → ReMe internal Ops (FrozenLake/BFCL/ToolMemory) + agent executor
 #   text-embedding-qwen3-embedding-0.6b ~1 GB → all experiments
-#   HaluMem LLMs: all via OpenRouter (gemini-2.5-flash / qwen3-max / qwen-plus-thinking)
+#   HaluMem LLMs: all via 阿里云百炼 (qwen-flash / qwen3-max / qwen-plus-thinking)
 #   Total Ollama VRAM ≈ 6 GB / 24 GB
 # =============================================================================
 
@@ -22,7 +22,7 @@ http:
 # ── LLM configs ───────────────────────────────────────────────────────────────
 llm:
   # Default: used by ALL ReMe internal Ops (FrozenLake/BFCL/ToolMemory summarize/retrieve)
-  # HaluMem memory ops go through OpenRouter (qwen-plus-thinking), not this default
+  # HaluMem memory ops override this via explicit default_llm_config in HaluMemEvaluator.__init__
   default:
     backend: openai_compatible
     base_url: http://localhost:11434/v1

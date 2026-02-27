@@ -68,6 +68,10 @@ def train(
     num_runs: int = 3,
     num_training_maps=15,
     is_slippery: bool = False,
+    model_name: str = "qwen3:8b",
+    llm_base_url: str = None,
+    llm_api_key: str = None,
+    enable_thinking: bool = False,
 ) -> None:
     """Phase 1: Generate task memory from random maps"""
     logger.info("🎯 Starting Training Phase - Generating Task Memory")
@@ -99,6 +103,10 @@ def train(
                     num_runs=num_runs,
                     use_task_memory=False,  # No task memory in training phase
                     make_task_memory=True,  # Generate task memory
+                    model_name=model_name,
+                    llm_base_url=llm_base_url,
+                    llm_api_key=llm_api_key,
+                    enable_thinking=enable_thinking,
                 )
                 future = agent.execute.remote()
                 future_list.append(future)
@@ -123,6 +131,10 @@ def train(
             num_runs=num_runs,
             use_task_memory=False,
             make_task_memory=True,
+            model_name=model_name,
+            llm_base_url=llm_base_url,
+            llm_api_key=llm_api_key,
+            enable_thinking=enable_thinking,
         )
         results = agent.execute()
         dump_results()
@@ -142,6 +154,10 @@ def test(
     num_runs: int = 5,
     num_test_maps: int = 100,
     is_slippery: bool = False,
+    model_name: str = "qwen3:8b",
+    llm_base_url: str = None,
+    llm_api_key: str = None,
+    enable_thinking: bool = False,
 ) -> None:
     """Phase 2: Test on fixed maps with/without task memory"""
     logger.info("🧪 Starting Test Phase - Evaluating Performance")
@@ -175,6 +191,10 @@ def test(
         max_workers=max_workers,
         num_runs=num_runs,
         use_task_memory=False,
+        model_name=model_name,
+        llm_base_url=llm_base_url,
+        llm_api_key=llm_api_key,
+        enable_thinking=enable_thinking,
     )
     all_results.extend(results_no_memory)
     dump_results("no_memory")
@@ -188,6 +208,10 @@ def test(
         max_workers=max_workers,
         num_runs=num_runs,
         use_task_memory=True,
+        model_name=model_name,
+        llm_base_url=llm_base_url,
+        llm_api_key=llm_api_key,
+        enable_thinking=enable_thinking,
     )
     all_results.extend(results_with_memory)
     dump_results("with_memory")
@@ -201,6 +225,10 @@ def run_test_configs(
     max_workers: int,
     num_runs: int,
     use_task_memory: bool,
+    model_name: str = "qwen3:8b",
+    llm_base_url: str = None,
+    llm_api_key: str = None,
+    enable_thinking: bool = False,
 ) -> List[Dict]:
     """Run a set of test configurations"""
     results = []
@@ -217,6 +245,10 @@ def run_test_configs(
                     num_runs=num_runs,
                     use_task_memory=use_task_memory,
                     make_task_memory=False,
+                    model_name=model_name,
+                    llm_base_url=llm_base_url,
+                    llm_api_key=llm_api_key,
+                    enable_thinking=enable_thinking,
                 )
                 future = agent.execute.remote()
                 future_list.append(future)
@@ -236,6 +268,10 @@ def run_test_configs(
             num_runs=num_runs,
             use_task_memory=use_task_memory,
             make_task_memory=False,
+            model_name=model_name,
+            llm_base_url=llm_base_url,
+            llm_api_key=llm_api_key,
+            enable_thinking=enable_thinking,
         )
         results = agent.execute()
 
@@ -251,7 +287,20 @@ def main():
     test_runs = 1  # Runs per test configuration
     num_test_maps = 100  # Number of test maps to use
     is_slippery = False
-    # model_name = "qwen-max-latest"
+
+    # ── LLM backend ────────────────────────────────────────────────────────────
+    # Small model via local Ollama (default):
+    model_name = "qwen3:8b"
+    llm_base_url = os.getenv("OPENAI_BASE_URL", "http://localhost:11434/v1")
+    llm_api_key = os.getenv("OPENAI_API_KEY", "ollama")
+    enable_thinking = False
+    #
+    # Large model via 阿里云百炼 (uncomment to switch):
+    # model_name = "qwen3-max"
+    # llm_base_url = os.getenv("BAILIAN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+    # llm_api_key = os.getenv("BAILIAN_API_KEY")
+    # enable_thinking = False   # set True to use qwen-plus-thinking instead
+    # ───────────────────────────────────────────────────────────────────────────
 
     # Initialize Ray if using multiple workers
     if max_workers > 1:
@@ -271,6 +320,10 @@ def main():
             num_runs=training_runs,
             num_training_maps=num_training_maps,
             is_slippery=is_slippery,
+            model_name=model_name,
+            llm_base_url=llm_base_url,
+            llm_api_key=llm_api_key,
+            enable_thinking=enable_thinking,
         )
 
         # Wait a bit for task memory service to process
@@ -284,6 +337,10 @@ def main():
             num_runs=test_runs,
             num_test_maps=num_test_maps,
             is_slippery=is_slippery,
+            model_name=model_name,
+            llm_base_url=llm_base_url,
+            llm_api_key=llm_api_key,
+            enable_thinking=enable_thinking,
         )
 
         # Summary
@@ -307,6 +364,7 @@ def main():
 
 
 if __name__ == "__main__":
+    import os as _os
     import sys as _sys
     _sys.path.insert(0, "..")
     try:

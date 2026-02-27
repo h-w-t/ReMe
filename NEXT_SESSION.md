@@ -13,13 +13,12 @@
 | 实验 | 层级 | 模型 | 路由 |
 |---|---|---|---|
 | FrozenLake / BFCL / ToolMemory | agent executor + ReMe Ops | `qwen3:8b` | Ollama |
-| HaluMem 底层 default LLM | `reme_model_name` | `qwen-long` | 阿里云百炼 |
+| HaluMem 底层 default LLM | `reme_model_name` | `qwen-flash` | 阿里云百炼 |
 | HaluMem QA 生成 + 评估 | `qwen3_max_instruct` | `qwen3-max` | 阿里云百炼 |
 | HaluMem 记忆推理 | `qwen-plus-thinking` | `qwen-plus-thinking-2025-01-21` | 阿里云百炼 |
 | Embedding（全部） | — | `text-embedding-qwen3-embedding-0.6b` | Ollama |
 
-> **为何用 `qwen-long` 而非 `qwen-flash`：**  
-> HaluMem 需要将每位用户百轮级别的完整对话历史塞入 prompt，gemini-flash 的核心优势恰好是 **1M token 上下文**。百炼平台唯一具备百万级窗口的模型是 `qwen-long`；`qwen-flash` 仅 128K，会截断长对话 prompt 导致错误。
+> **注**：`qwen-flash` 为百炼平台低成本默认模型（128K 上下文），单次手机内存流 batch_size=40⁠ 消息可控，足够应对 HaluMem 分批处理场景。若单 batch 中文本超过 128K，可临时改用 `qwen-long`。
 
 ### VRAM（RTX 4090 24GB）
 - Ollama 常驻：`qwen3:8b` (~5GB) + embed (~1GB) ≈ **6GB / 24GB**
@@ -28,7 +27,7 @@
 ### 云端 API 路由（阿里云百炼）
 - **Base URL**：`https://dashscope.aliyuncs.com/compatible-mode/v1`
 - **API Key**：`sk-0ce872aef6e1414fa0d675e4d379c78e`（已在 `.env.cloud`，勿入 git）
-- `qwen-long`：百万 token 上下文，用于 HaluMem memory ops（替代 gemini-flash）
+- `qwen-flash`：百炼默认模型，用于 HaluMem memory ops（替代 gemini-flash）
 - `qwen3-max`：高能力推理，用于 HaluMem QA 生成 + 评估
 - `qwen-plus-thinking-2025-01-21`：带 thinking 模式，用于 HaluMem 记忆推理，需 `enable_thinking: true`
 
@@ -128,7 +127,7 @@ python eval_reme.py --user_num 2 --max_concurrency 1
 
 # 完整运行（默认参数即正确配置）
 python eval_reme.py --user_num 100 --max_concurrency 3
-# reme_model_name=qwen-long（百炼，1M context）
+# reme_model_name=qwen-flash（百炼，默认）
 # eval_model_name=qwen3-max（百炼）
 # qwen-plus-thinking=qwen-plus-thinking-2025-01-21（百炼，记忆推理）
 
@@ -159,4 +158,4 @@ Stage 2 完成后立即关闭，预计总计 ≈ 4hr → 算力 **≈ ¥10**，�
 5. HaluMem 数据集 URL 需自行获取（论文仓库或作者联系）
 6. **LLM 路由已从 OpenRouter 切换为阿里云百炼**：环境变量 `OPENROUTER_*` → `BAILIAN_*`，`cloud_ollama.yaml` 和 `eval_reme.py` 中模型名称已同步更新
 7. **`qwen-plus-thinking-2025-01-21` 需要 `enable_thinking: true`**（extra_body），百炼兼容 DashScope 参数，代码中已配置
-8. **`qwen-long` 计费按实际 tokens**，HaluMem 长对话 prompt 单次可达 200K+，请监控 token 追踪器输出（每 2 分钟打印一次）
+8. **`qwen-flash` 计费按实际 tokens**，HaluMem 分批处理（batch_size=40）请监控 token 追踪器输出（每 2 分钟打印一次）

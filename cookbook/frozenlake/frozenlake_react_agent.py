@@ -1,3 +1,4 @@
+import os
 import random
 import re
 import time
@@ -44,7 +45,21 @@ class FrozenLakeReactAgent:
         num_runs: int = 1,
         use_task_memory: bool = False,
         make_task_memory: bool = False,
+        llm_base_url: str = None,
+        llm_api_key: str = None,
+        enable_thinking: bool = False,
     ):
+        """
+        Args:
+            llm_base_url: LLM endpoint. Set to ``http://localhost:11434/v1`` for Ollama
+                (small models, e.g. qwen3:8b). Leave ``None`` to read from
+                ``OPENAI_BASE_URL`` env var (defaults to DashScope / Bailian).
+            llm_api_key:  API key. Use ``"ollama"`` for Ollama, or leave ``None``
+                to read from ``OPENAI_API_KEY`` env var (Bailian key).
+            enable_thinking: Enable chain-of-thought. For Ollama backends this is
+                injected as a ``/think`` system-message prefix (Qwen3 style);
+                for DashScope / Bailian it uses ``extra_body={"enable_thinking": True}``.
+        """
 
         self.index = index
         self.task_configs = task_configs
@@ -55,8 +70,16 @@ class FrozenLakeReactAgent:
         self.num_runs = num_runs
         self.use_task_memory = use_task_memory
         self.make_task_memory = make_task_memory
+        self.enable_thinking = enable_thinking
 
-        self.llm_client = OpenAI()
+        # Resolve LLM endpoint — explicit args take priority over env vars.
+        self.llm_base_url = llm_base_url or os.getenv("OPENAI_BASE_URL")
+        self.llm_api_key = llm_api_key or os.getenv("OPENAI_API_KEY", "ollama")
+
+        self.llm_client = OpenAI(
+            base_url=self.llm_base_url,
+            api_key=self.llm_api_key,
+        )
         self.action_map = {0: "LEFT", 1: "DOWN", 2: "RIGHT", 3: "UP"}
 
         # Token tracking: patch openai in each Ray actor process
@@ -82,16 +105,58 @@ class FrozenLakeReactAgent:
                 "Prompt file not found. Please check your current path (should be ./cook/frozenlake) and try again.",
             )
 
+    # ------------------------------------------------------------------
+    # Thinking-mode helpers
+    # ------------------------------------------------------------------
+
+    def _is_ollama(self) -> bool:
+        """Return True when the LLM endpoint is an Ollama instance."""
+        url = self.llm_base_url or ""
+        return "11434" in url or "ollama" in url.lower()
+
+    def _inject_thinking_prefix(self, messages: List[Dict]) -> List[Dict]:
+        """Inject Ollama-compatible thinking control prefix into the first system message.
+
+        Ollama Qwen3 uses '/think' or '/no_think' at the start of the system prompt
+        to control chain-of-thought reasoning, replacing DashScope's extra_body approach.
+        """
+        prefix = "/think\n" if self.enable_thinking else "/no_think\n"
+        adapted = []
+        found_system = False
+        for msg in messages:
+            if msg.get("role") == "system" and not found_system:
+                adapted.append({**msg, "content": prefix + msg["content"]})
+                found_system = True
+            else:
+                adapted.append(msg)
+        if not found_system:
+            adapted = [{"role": "system", "content": prefix.strip()}] + adapted
+        return adapted
+
+    # ------------------------------------------------------------------
+
     def call_llm(self, messages: List[Dict]) -> str:
-        """Call LLM with retry logic"""
+        """Call LLM with retry logic.
+
+        * Ollama endpoints: thinking controlled via ``/think`` / ``/no_think``
+          system-message prefix (Qwen3 native style).
+        * DashScope / Bailian endpoints: thinking controlled via
+          ``extra_body={"enable_thinking": ...}``.
+        """
+        if self._is_ollama():
+            messages = self._inject_thinking_prefix(messages)
+            extra_kwargs: dict = {}
+        else:
+            extra_kwargs = {"extra_body": {"enable_thinking": self.enable_thinking}}
+
         for i in range(5):
             try:
                 response = self.llm_client.chat.completions.create(
                     model=self.model_name,
                     messages=messages,
                     temperature=self.temperature,
-                    extra_body={"enable_thinking": False},
                     seed=0,
+                    **extra_kwargs,
                 )
                 return response.choices[0].message.content
             except Exception as e:

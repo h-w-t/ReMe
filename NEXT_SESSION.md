@@ -2,7 +2,7 @@
 
 ## 当前状态
 - 分支 `experiment/cloud-ollama` 已推送到远程
-- 本地 Phase 1-2 完成：simple_demo ✅，tool_memory (+16.75%) ✅
+- 本地 Phase 1-2 完成：simple_demo ✅，tool_memory ✅
 - 代码适配完成，准备在云端执行全部实验
 
 ---
